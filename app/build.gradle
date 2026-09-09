@@ -6,6 +6,10 @@ android {
     namespace "cn.edu.lzu.mail"
     compileSdk 35
 
+    buildFeatures {
+        buildConfig true
+    }
+
     defaultConfig {
         applicationId "cn.edu.lzu.mail"
         minSdk 23
@@ -14,4 +18,3 @@ android {
         versionName "1.0"
     }
 }
-
