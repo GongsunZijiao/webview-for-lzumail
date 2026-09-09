@@ -6,6 +6,7 @@ import android.app.DownloadManager;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.net.Uri;
 import android.net.http.SslError;
@@ -16,6 +17,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.view.WindowInsets;
 import android.webkit.CookieManager;
 import android.webkit.DownloadListener;
 import android.webkit.SslErrorHandler;
@@ -37,23 +39,27 @@ import android.widget.Toast;
 
 public class MainActivity extends Activity {
     private static final String HOME_URL = "https://mail.lzu.edu.cn/";
+    private static final String PREFS_NAME = "lzu_mail_webview";
+    private static final String KEY_LAST_URL = "last_url";
     private static final int FILE_CHOOSER_REQUEST_CODE = 42;
 
     private WebView webView;
     private ProgressBar progressBar;
     private LinearLayout errorPanel;
     private TextView errorMessage;
+    private SharedPreferences preferences;
     private ValueCallback<Uri[]> uploadCallback;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        preferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         configureWindow();
         buildLayout();
         configureWebView();
 
         if (savedInstanceState == null) {
-            webView.loadUrl(HOME_URL);
+            webView.loadUrl(preferences.getString(KEY_LAST_URL, HOME_URL));
         } else {
             webView.restoreState(savedInstanceState);
         }
@@ -71,8 +77,22 @@ public class MainActivity extends Activity {
 
     private void buildLayout() {
         FrameLayout root = new FrameLayout(this);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            root.setOnApplyWindowInsetsListener((view, insets) -> {
+                view.setPadding(
+                        0,
+                        insets.getSystemWindowInsetTop(),
+                        0,
+                        insets.getSystemWindowInsetBottom()
+                );
+                return insets;
+            });
+        }
 
         webView = new WebView(this);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            webView.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_YES);
+        }
         root.addView(webView, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
@@ -154,6 +174,8 @@ public class MainActivity extends Activity {
         settings.setDisplayZoomControls(false);
         settings.setAllowContentAccess(true);
         settings.setAllowFileAccess(true);
+        settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+        settings.setSaveFormData(true);
 
         String userAgent = settings.getUserAgentString()
                 .replace("; wv", "")
@@ -235,6 +257,7 @@ public class MainActivity extends Activity {
         public void onPageFinished(WebView view, String url) {
             progressBar.setVisibility(View.GONE);
             CookieManager.getInstance().flush();
+            rememberUrl(url);
         }
 
         @Override
@@ -322,6 +345,19 @@ public class MainActivity extends Activity {
         return true;
     }
 
+    private void rememberUrl(String url) {
+        if (url == null || url.isEmpty()) {
+            return;
+        }
+
+        Uri uri = Uri.parse(url);
+        if (!"mail.lzu.edu.cn".equalsIgnoreCase(uri.getHost())) {
+            return;
+        }
+
+        preferences.edit().putString(KEY_LAST_URL, url).apply();
+    }
+
     private void openExternal(Uri uri) {
         try {
             startActivity(new Intent(Intent.ACTION_VIEW, uri));
@@ -378,6 +414,7 @@ public class MainActivity extends Activity {
     protected void onPause() {
         webView.onPause();
         webView.pauseTimers();
+        CookieManager.getInstance().flush();
         super.onPause();
     }
 
@@ -405,4 +442,3 @@ public class MainActivity extends Activity {
         super.onDestroy();
     }
 }
-
