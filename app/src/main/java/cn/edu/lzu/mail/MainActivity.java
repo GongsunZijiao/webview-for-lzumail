@@ -263,6 +263,12 @@ public class MainActivity extends Activity {
 
         @Override
         public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
+            Uri url = Uri.parse(error.getUrl());
+            if ("mail.lzu.edu.cn".equalsIgnoreCase(url.getHost())) {
+                handler.proceed();
+                return;
+            }
+
             handler.cancel();
             showError("证书校验失败，请检查系统时间或网络环境。");
         }
